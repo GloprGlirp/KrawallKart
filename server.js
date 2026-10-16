@@ -81,6 +81,8 @@ wss.on('connection', ws => {
       ws.room = code;
       send(ws, { t: 'joined', code, id: ws.id, host: room.host });
       bcast(room, { t: 'peer-join', id: ws.id }, ws.id);
+    } else if (m.t === 'ping') {
+      send(ws, { t: 'pong', c: m.c, s: Date.now() });
     } else if (m.t === 'leave') {
       leave(ws);
     } else if (m.t === 'state') {

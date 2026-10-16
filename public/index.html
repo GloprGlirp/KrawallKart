@@ -105,6 +105,20 @@ input[type=text]:focus{outline:3px solid var(--sky);outline-offset:2px}
 #minimap{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:190px;height:190px}
 #hudSpeed{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));font-size:22px;text-shadow:2px 2px 0 var(--ink);text-align:right}
 #hudSpeed b{font-weight:400;font-size:54px;display:block;line-height:.9;color:#fff;font-variant-numeric:tabular-nums}
+#driftBar{width:130px;height:10px;border:3px solid var(--ink);border-radius:8px;background:rgba(20,33,77,.6);margin:6px 0 0 auto;overflow:hidden;opacity:0;transition:opacity .15s}
+#driftBar.on{opacity:1}
+#driftBar i{display:block;height:100%;width:0}
+#keymap{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);font-family:var(--font-body);display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#kmToggle{pointer-events:auto;font:800 11px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:#fff;background:rgba(20,33,77,.85);border:2px solid var(--ink);border-radius:8px;padding:4px 8px;cursor:pointer;display:flex;gap:6px;align-items:center}
+#kmToggle:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+#kmList{list-style:none;margin:0;padding:8px 10px;display:flex;flex-direction:column;gap:5px;background:rgba(20,33,77,.8);border:3px solid var(--ink);border-radius:12px;font-size:13px;font-weight:600;color:#fff}
+#kmList li{display:grid;grid-template-columns:92px auto;align-items:center;gap:8px}
+#kmList .ks{display:flex;gap:4px;justify-content:flex-end}
+#keymap kbd{font:700 11px var(--font-body);min-width:18px;text-align:center;color:var(--ink);background:var(--paper);border:2px solid var(--ink);border-bottom-width:3px;border-radius:5px;padding:1px 5px}
+#kmList li.on{color:var(--sun)}
+#kmList li.on kbd{background:var(--sun);transform:translateY(1px);border-bottom-width:2px}
+#keymap.min #kmList{display:none}
+@media (max-width:700px),(pointer:coarse){#keymap{display:none}}
 #banner{position:absolute;left:0;right:0;top:34%;text-align:center;font-size:clamp(48px,11vw,120px);color:var(--sun);transform:skewX(-9deg);
   text-shadow:5px 5px 0 var(--ink),-2px -2px 0 var(--ink),2px -2px 0 var(--ink),-2px 2px 0 var(--ink);opacity:0;transition:opacity .15s}
 #banner.show{opacity:1}
@@ -200,7 +214,20 @@ input[type=text]:focus{outline:3px solid var(--sky);outline-offset:2px}
   <div id="itemSlot"><div id="itemIcon"></div><span id="itemCount" hidden>3</span><span id="itemKey">E</span></div>
   <ol id="hudRank"></ol>
   <canvas id="minimap" width="380" height="380"></canvas>
-  <div id="hudSpeed"><b id="spd">0</b>km/h</div>
+  <div id="hudSpeed"><b id="spd">0</b>km/h<div id="driftBar"><i></i></div></div>
+  <aside id="keymap" aria-label="Steuerung">
+    <button id="kmToggle" type="button">Steuerung <kbd>H</kbd></button>
+    <ul id="kmList">
+      <li data-k="gas"><span class="ks"><kbd>W</kbd><kbd>↑</kbd></span>Gas</li>
+      <li data-k="brake"><span class="ks"><kbd>S</kbd><kbd>↓</kbd></span>Bremse</li>
+      <li data-k="steer"><span class="ks"><kbd>A</kbd><kbd>D</kbd></span>Lenken</li>
+      <li data-k="drift"><span class="ks"><kbd>Shift</kbd><kbd>Leer</kbd></span>Drift / Turbo</li>
+      <li data-k="use"><span class="ks"><kbd>E</kbd><kbd>Strg</kbd></span>Item</li>
+      <li data-k="reset"><span class="ks"><kbd>R</kbd></span>Zurück auf Strecke</li>
+      <li><span class="ks"><kbd>Esc</kbd></span>Pause</li>
+      <li><span class="ks"><kbd>M</kbd></span>Ton an/aus</li>
+    </ul>
+  </aside>
   <div id="toast"></div>
   <div id="banner"></div>
   <div id="touch" hidden>
@@ -532,7 +559,7 @@ function drawTrackThumb(cv,ti){const g=cv.getContext('2d'),w=cv.width,h=cv.heigh
 const keys={};const touch={left:0,right:0,drift:0,item:0,brake:0};
 const isTouch=matchMedia('(pointer:coarse)').matches;
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;keys[e.code]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
-  if(e.code==='Escape'&&G.race)togglePause();if(e.code==='KeyM'){Snd.muted=!Snd.muted;$('#mute').checked=Snd.muted;store.set('muted',Snd.muted)}});
+  if(e.code==='Escape'&&G.race)togglePause();if(e.code==='KeyH')toggleKeymap();if(e.code==='KeyM'){Snd.muted=!Snd.muted;$('#mute').checked=Snd.muted;store.set('muted',Snd.muted)}});
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 document.querySelectorAll('#touch button').forEach(b=>{const k=b.dataset.k;const on=e=>{e.preventDefault();touch[k]=1;b.classList.add('on')},off=e=>{touch[k]=0;b.classList.remove('on')};
@@ -541,15 +568,22 @@ function readInput(){const k=keys;let steer=0;if(k.KeyA||k.ArrowLeft||touch.left
   return{gas:(k.KeyW||k.ArrowUp||(isTouch&&!touch.brake))?1:0,brake:(k.KeyS||k.ArrowDown||touch.brake)?1:0,steer,
     drift:(k.ShiftLeft||k.ShiftRight||k.Space||touch.drift)?1:0,use:(k.KeyE||k.ControlLeft||k.ControlRight||k.KeyX||touch.item)?1:0,reset:k.KeyR?1:0}}
 
+const kmItems=[...document.querySelectorAll('#kmList li[data-k]')];
+function toggleKeymap(force){const km=$('#keymap');const min=force!=null?force:!km.classList.contains('min');km.classList.toggle('min',min);store.set('kmMin',min)}
+toggleKeymap(store.get('kmMin',false));$('#kmToggle').onclick=()=>toggleKeymap();
+
 /* ---------------- Netzwerk ---------------- */
 const Net={ws:null,ok:false,
   connect(){return new Promise(res=>{if(!/^https?:$/.test(location.protocol))return res(false);let ws;try{ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws')}catch(e){return res(false)}
     const to=setTimeout(()=>{try{ws.close()}catch(e){}res(false)},6000);
-    ws.onopen=()=>{clearTimeout(to);this.ws=ws;this.ok=true;res(true)};ws.onerror=()=>{clearTimeout(to);res(false)};
+    ws.onopen=()=>{clearTimeout(to);this.ws=ws;this.ok=true;this.syncN=0;this.rtt=1e9;this.sync();res(true)};ws.onerror=()=>{clearTimeout(to);res(false)};
     ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}onServer(m)};ws.onclose=()=>{this.ws=null;this.ok=false;onNetClosed()}})},
   raw(o){if(this.ws&&this.ws.readyState===1)this.ws.send(JSON.stringify(o))},
   send(data,to){if(G.online)this.raw({t:'msg',to,data})},
+  offset:0,rtt:1e9,syncN:0,
+  sync(){this.raw({t:'ping',c:Date.now()});clearTimeout(this.syncT);if(this.ws)this.syncT=setTimeout(()=>this.sync(),this.syncN++<6?250:5000)},
 };
+const serverNow=()=>Date.now()+Net.offset;
 
 /* ---------------- Spielzustand ---------------- */
 const G={online:false,isHost:true,myId:'me',hostId:'me',code:null,name:store.get('name',''),char:store.get('char','fips'),
@@ -631,7 +665,7 @@ $('#bStart').onclick=()=>{
   if(L.mode==='cup'){cfg.track=CUPS[L.cup].tracks[0];cfg.cup={cup:L.cup,race:0,points:{}}}
   launch(cfg);
 };
-function launch(cfg){if(G.online){Net.send(cfg);Net.raw({t:'state',started:true})}startRace(cfg)}
+function launch(cfg){if(G.online){cfg.startAt=Math.round(serverNow()+3300);Net.send(cfg);Net.raw({t:'state',started:true})}startRace(cfg)}
 function racePoints(){const R=G.race,c=R.cup;const tot=Object.assign({},c.points),add={};rankList().forEach((k,i)=>{add[k.id]=CUP_PTS[i]||0;tot[k.id]=(tot[k.id]||0)+add[k.id]});return{tot,add}}
 function nextCupRace(){const R=G.race,c=R.cup;const{tot}=racePoints();
   const grid=R.grid.filter(g=>g.bot||!G.online||G.lobby.players.some(p=>p.id===g.id)).sort((a,b)=>(tot[a.id]||0)-(tot[b.id]||0));
@@ -648,6 +682,7 @@ function onServer(m){
       if(G.race)removeKart(m.id);break;
     case'room-closed':leaveToTitle('Der Host hat die Lobby geschlossen.');break;
     case'msg':onPeer(m.from,m.data);break;
+    case'pong':{const now=Date.now(),rtt=now-m.c;Net.rtt*=1.03;if(rtt<=Net.rtt){Net.rtt=rtt;Net.offset=m.s+rtt/2-now}break}
   }
 }
 function onNetClosed(){setNetStatus(false);if(G.online)leaveToTitle('Verbindung zum Server verloren.');tries=0;setTimeout(tryConnect,2000)}
@@ -659,8 +694,8 @@ function onPeer(from,d){
     case'lobby':if(G.isHost)return;G.lobby={players:d.players,track:d.track,cup:d.cup,mode:d.mode,laps:d.laps,bots:d.bots};G.hostId=d.host;if(G.screen==='scrLobby')renderLobby();break;
     case'start':if(G.isHost)return;startRace(d);break;
     case'toLobby':if(G.isHost)return;openLobby();break;
-    case's':if(R)netState(from,d.a);break;
-    case'b':if(R)for(const a of d.a)netState(a[0],a.slice(1));break;
+    case's':if(R)netState(from,d.a,d.ts);break;
+    case'b':if(R)for(const a of d.a)netState(a[0],a.slice(1),d.ts);break;
     case'ev':if(R)netEvent(d.e,from);break;
   }
 }
@@ -673,7 +708,7 @@ function startRace(cfg){
   enterMenu();menuRoot.visible=false;show(null);$('#hud').hidden=false;$('#touch').hidden=!isTouch;G.paused=false;
   const T=buildTrack(cfg.track);raceRoot=T.root;scene.add(raceRoot);
   const rnd=mkRng(cfg.seed);
-  const R=G.race={T,cup:cfg.cup||null,grid:cfg.grid,laps:cfg.laps,karts:new Map(),list:[],objs:new Map(),t:0,count:3.6,started:false,objSeq:0,sendT:0,fx:[],rnd,finishOrder:[],resultsShown:false,gasAt:-1,lastBeep:4,myFinish:null};
+  const R=G.race={T,startAt:cfg.startAt||0,cup:cfg.cup||null,grid:cfg.grid,laps:cfg.laps,karts:new Map(),list:[],objs:new Map(),t:0,count:3.6,started:false,objSeq:0,sendT:0,fx:[],rnd,finishOrder:[],resultsShown:false,gasAt:-1,lastBeep:4,myFinish:null};
   cfg.grid.forEach((g,n)=>{
     const ch=charById(g.char);const i=(T.N-3-Math.floor(n/2)*4+T.N)%T.N;const lat=(n%2?-1:1)*T.W*.42;const[x,z]=T.at(i,lat);
     const mine=g.id===G.myId;const ctrl=mine||(g.bot&&G.isHost);
@@ -710,26 +745,34 @@ function physics(k,inp,dt){
   else if(inp.brake){if(k.speed>0)k.speed=Math.max(0,k.speed-34*dt);else k.speed=Math.max(-11,k.speed-12*dt)}
   else k.speed-=Math.sign(k.speed)*Math.min(Math.abs(k.speed),7*dt);
   if(k.speed>maxS)k.speed=Math.max(maxS,k.speed-(k.speed-maxS)*2.2*dt);
-  // Lenken & Driften
+  // Lenken: Eingabe wird weich angefahren statt hart umgeschaltet
+  k.steerS=(k.steerS||0)+(inp.steer-(k.steerS||0))*(1-Math.exp(-dt*(inp.steer?10:14)));
+  const s=k.steerS;
   const steerAmt=clamp(sp/7,0,1)*(1-.3*clamp(sp/st.max,0,1));
-  if(k.drift){
-    if(!inp.drift||sp<9||k.spin>0){
-      if(k.driftT>1.9){giveBoost(k,1.2);if(k.mine)toast('Super-Turbo!')}else if(k.driftT>.9){giveBoost(k,.65);if(k.mine)toast('Mini-Turbo!')}
-      k.drift=0;k.driftT=0}
-    else{k.driftT+=dt;const s=inp.steer*k.drift;k.yaw-=k.drift*(.62+.42*s)*st.turn*dt;k.lat=lerp(k.lat,-k.drift*sp*.26,dt*4)}
-  }else{
-    if(inp.drift&&sp>13&&Math.abs(inp.steer)>.3&&k.spin<=0){k.drift=Math.sign(inp.steer);k.driftT=0;k.hop=.22}
-    k.yaw-=st.turn*inp.steer*steerAmt*Math.sign(k.speed||1)*dt;
-    k.lat-=inp.steer*sp*.035*(1-T.grip);
-  }
-  k.lat*=Math.pow(k.drift?.5:.02*(1-T.grip)+.0005,dt*(k.drift?1:T.grip*1.2+.2));
+  // Drift: Hüpfer beim Drücken, Drift startet mit Lenkrichtung und blendet weich ein/aus
+  const press=inp.drift&&!k.driftHeld;k.driftHeld=!!inp.drift;
+  if(press&&k.spin<=0&&!k.drift){k.hop=.22;k.driftWin=.35}
+  if(k.driftWin>0)k.driftWin-=dt;
+  if(!k.drift&&inp.drift&&(k.driftWin>0||sp>18)&&sp>12&&Math.abs(inp.steer)>.25&&k.spin<=0){k.drift=Math.sign(inp.steer);k.driftDir=k.drift;k.driftT=0}
+  if(k.drift&&(!inp.drift||sp<9||k.spin>0)){
+    if(k.driftT>1.9){giveBoost(k,1.2);if(k.mine)toast('Super-Turbo!')}else if(k.driftT>.9){giveBoost(k,.65);if(k.mine)toast('Mini-Turbo!')}
+    k.drift=0;k.driftT=0}
+  if(k.drift)k.driftT+=dt;
+  k.db=(k.db||0)+((k.drift?1:0)-(k.db||0))*(1-Math.exp(-dt*(k.drift?8:5)));
+  let rate=st.turn*s*steerAmt*Math.sign(k.speed||1);
+  if(k.db>.002){const dir=k.driftDir||1;const dr=dir*(.6+.45*clamp(s*dir,-1,1))*st.turn;rate=lerp(rate,dr,k.db)}
+  k.yaw-=rate*dt;k.yr=-rate;
+  const latT=k.db>.002?-(k.driftDir||1)*sp*.26*k.db:0;
+  if(!k.drift)k.lat-=s*sp*2.1*(1-T.grip)*dt;
+  k.lat+=(latT-k.lat)*(1-Math.exp(-dt*(k.drift?4:6*T.grip+1.5)));
   const fx=Math.sin(k.yaw),fz=Math.cos(k.yaw),rx=-fz,rz=fx;
   k.x+=(fx*k.speed+rx*k.lat)*dt;k.z+=(fz*k.speed+rz*k.lat)*dt;
   // Wand
   n=T.nearest(k.x,k.z,k.idx);k.idx=n.i;const lim=T.wallD-1.1;
   if(Math.abs(n.d)>lim){const over=n.d-Math.sign(n.d)*lim;k.x-=T.lx(n.i)*over;k.z-=T.lz(n.i)*over;
     let ty=T.yaw(n.i);if(Math.abs(angDiff(k.yaw,ty))>Math.PI/2)ty+=Math.PI;const a=Math.abs(angDiff(k.yaw,ty));
-    if(a>.5&&k.speed>8){k.speed*=.45;if(k.mine)Snd.noise(.12,.08)}else k.speed*=Math.pow(.6,dt);k.yaw+=angDiff(k.yaw,ty)*.15;k.lat*=.3}
+    if(a>.5&&k.speed>8){k.speed*=.45;if(k.mine)Snd.noise(.12,.08)}else k.speed*=Math.pow(.6,dt);k.yaw+=angDiff(k.yaw,ty)*(1-Math.exp(-dt*9));k.lat*=.3}
+  k.vx=fx*k.speed+rx*k.lat;k.vz=fz*k.speed+rz*k.lat;
   // Fortschritt
   let dI=n.i-k.prevIdx;if(k.prevIdx==null)dI=0;if(dI<-T.N/2)dI+=T.N;if(dI>T.N/2)dI-=T.N;k.u+=dI;k.prevIdx=n.i;
   const lap=Math.floor(k.u/T.N)+1;
@@ -758,8 +801,9 @@ function useItem(k){
 function applyThunder(from){const R=G.race;const rl=rankList();const fi=rl.findIndex(x=>x.id===from);
   if(R.me&&rl.indexOf(R.me)<fi){flash();Snd.noise(.6,.25)}else if(R.me&&R.me.id===from){flash();toast('Donnerwolke!')}
   rl.forEach((k,i)=>{if(i<fi&&k.ctrl)spinout(k,.9)})}
-function spawnObj(o,remote){const R=G.race;if(!remote){o.id=G.myId+'-'+(++R.objSeq);Net.send({k:'ev',e:{type:'spawn',o}})}
-  o.age=0;o.idx=-1;o.life={oil:30,ball:7,bomb:4,comet:25}[o.type]||10;
+function spawnObj(o,remote){const R=G.race;if(!remote){o.id=G.myId+'-'+(++R.objSeq);o.ts=Math.round(serverNow());Net.send({k:'ev',e:{type:'spawn',o}})}
+  const lag=remote?clamp((serverNow()-(o.ts||serverNow()))/1000,0,.3):0;if(lag&&o.vx!=null){o.x+=o.vx*lag;o.z+=o.vz*lag}
+  o.age=lag;o.idx=-1;o.life={oil:30,ball:7,bomb:4,comet:25}[o.type]||10;
   let m;if(o.type==='oil'){m=new THREE.Group();const d=new THREE.Mesh(new THREE.CircleGeometry(1.9,18),new THREE.MeshBasicMaterial({color:0x15141a}));d.rotation.x=-Math.PI/2;d.position.y=.09;d.scale.set(1,.8,1);m.add(d);
     const sh=new THREE.Mesh(new THREE.RingGeometry(.7,1.0,18),new THREE.MeshBasicMaterial({color:0x6cc4ff,transparent:true,opacity:.6}));sh.rotation.x=-Math.PI/2;sh.position.set(.3,.1,.2);m.add(sh)}
   else if(o.type==='ball'){m=new THREE.Mesh(new THREE.SphereGeometry(.65,16,12),lam(0x2ed39b,{emissive:0x0b4a35}))}
@@ -811,10 +855,11 @@ function netEvent(e,from){const R=G.race;
     case'thunder':applyThunder(e.from);break;
     case'finish':{const k=R.karts.get(e.id);if(k&&!k.finished){k.finished=true;k.ftime=e.time}break}
   }}
-function netState(id,a){const R=G.race;const k=R.karts.get(id);if(!k||k.ctrl)return;
-  const[x,z,yaw,sp,u,spin,drift,boost,shield,ghost]=a;k.net={x,z,yaw,sp,t:performance.now()};k.u=u;k.spin=spin;k.ghost=ghost||0;k.drift=drift;k.boost=boost;k.shield=shield;k.speed=sp;
-  if(k.lastX==null||(k.x-x)**2+(k.z-z)**2>400){k.x=x;k.z=z;k.yaw=yaw}k.lastX=x}
-function packState(k){const r=v=>Math.round(v*100)/100;return[r(k.x),r(k.z),r(k.yaw),r(k.speed),r(k.u),r(Math.max(0,k.spin)),k.drift,r(Math.max(0,k.boost)),k.shield>0?1:0,r(Math.max(0,k.ghost||0))]}
+function netState(id,a,ts){const R=G.race;const k=R.karts.get(id);if(!k||k.ctrl)return;
+  const[x,z,yaw,vx,vz,yr,sp,u,spin,drift,dT,boost,shield,ghost]=a;if(k.net&&ts<k.net.ts)return;
+  k.net={x,z,yaw,vx,vz,yr,ts};k.u=u;k.spin=spin;k.drift=drift;k.driftT=dT;k.boost=boost;k.shield=shield;k.ghost=ghost||0;k.speed=sp;
+  if(k.lastX==null){k.x=k.px=x;k.z=k.pz=z;k.yaw=k.pyaw=yaw}k.lastX=x}
+function packState(k){const r=v=>Math.round(v*100)/100;return[r(k.x),r(k.z),r(k.yaw),r(k.vx||0),r(k.vz||0),r(k.yr||0),r(k.speed),r(k.u),r(Math.max(0,k.spin)),k.drift,r(k.driftT||0),r(Math.max(0,k.boost)),k.shield>0?1:0,r(Math.max(0,k.ghost||0))]}
 
 function botInput(k,dt){
   const R=G.race,T=R.T,ai=k.ai;
@@ -833,20 +878,23 @@ function botInput(k,dt){
 
 function stepRace(dt){
   const R=G.race,T=R.T;const me=R.me;
+  for(const k of R.list){k.px=k.x;k.pz=k.z;k.pyaw=k.yaw}
   if(!R.started){
-    R.count-=dt;const c=Math.ceil(R.count-.6);
+    if(R.startAt)R.count=(R.startAt-serverNow())/1000+.6;else R.count-=dt;const c=Math.ceil(R.count-.6);
     if(c<R.lastBeep&&c>=1&&c<=3){R.lastBeep=c;banner(String(c),700);Snd.beep(false)}
     const inp=readInput();if(inp.gas&&R.gasAt<0)R.gasAt=R.count;if(!inp.gas)R.gasAt=-1;
     if(R.count<=.6){R.started=true;banner('LOS!',800);Snd.beep(true);
       if(me&&R.gasAt>0&&R.gasAt<1.5){giveBoost(me,1.3);toast('Raketenstart!')}
       for(const k of R.list)if(k.bot&&k.ctrl&&R.rnd()<.5)giveBoost(k,.8)}
-    for(const k of R.list){k.mdl.g.position.set(k.x,0,k.z)}
     return}
-  R.t+=dt;
+  if(R.startAt)R.t=Math.max(0,(serverNow()-R.startAt)/1000);else R.t+=dt;
   for(const k of R.list){
     if(!k.ctrl){ // Fremde Karts interpolieren
-      if(k.net){const age=Math.min((performance.now()-k.net.t)/1000,.25);const tx=k.net.x+Math.sin(k.net.yaw)*k.net.sp*age,tz=k.net.z+Math.cos(k.net.yaw)*k.net.sp*age;
-        k.x=lerp(k.x,tx,.25);k.z=lerp(k.z,tz,.25);k.yaw+=angDiff(k.yaw,k.net.yaw)*.25;k.spin=Math.max(0,k.spin-dt);k.ghost=Math.max(0,(k.ghost||0)-dt)}
+      const n=k.net;if(n){ // Vorhersage aus letztem Zustand + Laufzeit, Fehler wird weich ausgeglichen
+        const age=clamp((serverNow()-n.ts)/1000,0,.35);const px=n.x+n.vx*age,pz=n.z+n.vz*age,pyaw=n.yaw+n.yr*age;
+        k.x+=n.vx*dt;k.z+=n.vz*dt;k.yaw+=n.yr*dt;const ex=px-k.x,ez=pz-k.z;
+        if(ex*ex+ez*ez>150){k.x=k.px=px;k.z=k.pz=pz;k.yaw=k.pyaw=pyaw}else{const f=1-Math.exp(-dt*7);k.x+=ex*f;k.z+=ez*f;k.yaw+=angDiff(k.yaw,pyaw)*f}
+        k.spin=Math.max(0,k.spin-dt);k.ghost=Math.max(0,(k.ghost||0)-dt);if(k.drift)k.driftT=(k.driftT||0)+dt;if(k.hop>0)k.hop-=dt}
       continue}
     let inp;if(k.mine&&!k.finished){inp=readInput();if(inp.reset&&!k.resetLatch){const[x,z]=T.at(k.idx,0);k.x=x;k.z=z;k.yaw=T.yaw(k.idx);k.speed=0;k.lat=0}k.resetLatch=inp.reset}
     else inp=botInput(k,dt);
@@ -869,18 +917,24 @@ function stepRace(dt){
     if(a.ctrl)a.speed*=.985;if(b.ctrl)b.speed*=.985}
   for(const b of T.boxes)if(b.cool>0){b.cool-=dt;if(b.cool<=0)b.m.visible=true}
   updateObjs(dt);
-  // Netz senden
-  R.sendT-=dt;if(G.online&&R.sendT<=0){R.sendT=.05;if(me)Net.send({k:'s',a:packState(me)});if(G.isHost){const bots=R.list.filter(k=>k.bot);if(bots.length)Net.send({k:'b',a:bots.map(k=>[k.id,...packState(k)])})}}
 }
+// Einmal pro Bild senden, Zeitstempel passt genau zum simulierten Zustand
+function netSend(rdt){const R=G.race;if(!R||!R.started||!G.online)return;R.sendT-=rdt;if(R.sendT>0)return;R.sendT=.05;
+  const ts=Math.round(serverNow()-acc*1000);if(R.me)Net.send({k:'s',ts,a:packState(R.me)});
+  if(G.isHost){const bots=R.list.filter(k=>k.bot);if(bots.length)Net.send({k:'b',ts,a:bots.map(k=>[k.id,...packState(k)])})}}
 
 /* ---------------- Darstellung ---------------- */
-const camPos=new THREE.Vector3(),camLook=new THREE.Vector3();
-function renderRace(dt,time){
+const camPos=new THREE.Vector3(),camLook=new THREE.Vector3(),camTgt=new THREE.Vector3();
+function renderRace(dt,time,alpha){
   const R=G.race,T=R.T;
-  for(const k of R.list){const m=k.mdl;m.g.position.set(k.x,0,k.z);m.g.rotation.y=k.yaw;
-    const spinA=k.spin>0?k.spin*TAU*1.4:0;m.inner.rotation.y=spinA+(k.drift?k.drift*-.35:0);
-    m.inner.position.y=k.hop>0?Math.sin(k.hop/.22*Math.PI)*.5:0;m.inner.rotation.z=k.drift?k.drift*.06:0;
-    const steerVis=k.mine?readInput().steer:clamp((k.drift||0)*.6,-1,1);
+  for(const k of R.list){const m=k.mdl;
+    k.rx=k.px!=null?lerp(k.px,k.x,alpha):k.x;k.rz=k.pz!=null?lerp(k.pz,k.z,alpha):k.z;k.ryaw=k.pyaw!=null?k.pyaw+angDiff(k.pyaw,k.yaw)*alpha:k.yaw;
+    m.g.position.set(k.rx,0,k.rz);m.g.rotation.y=k.ryaw;
+    if(k.drift&&!k.vdbOn){k.vdbOn=1;if(!k.ctrl)k.hop=.22}if(!k.drift)k.vdbOn=0;
+    k.vdb=(k.vdb||0)+((k.drift?1:0)-(k.vdb||0))*(1-Math.exp(-dt*9));if(k.drift)k.vdir=k.drift;
+    const spinA=k.spin>0?k.spin*TAU*1.4:0;m.inner.rotation.y=spinA-(k.vdir||0)*.38*k.vdb;
+    m.inner.position.y=k.hop>0?Math.sin(k.hop/.22*Math.PI)*.5:0;m.inner.rotation.z=(k.vdir||0)*.07*k.vdb+(k.ctrl?-(k.steerS||0)*.03:0);
+    const steerVis=k.ctrl?(k.steerS||0):clamp((k.drift||0)*.6,-1,1);
     for(const w of m.wheels){w.w.rotation.x+=k.speed*dt/.4;if(w.front)w.piv.rotation.y=-steerVis*.4}
     const boosting=k.boost>0;for(const f of m.flames){f.visible=boosting;if(boosting)f.scale.setScalar(.8+Math.random()*.5)}
     m.shield.visible=k.shield>0;if(m.shield.visible)m.shield.rotation.y=time*2;
@@ -891,9 +945,10 @@ function renderRace(dt,time){
   for(const b of T.boxes){b.m.rotation.y+=dt*1.5;b.m.rotation.x+=dt*.7;b.m.position.y=1.3+Math.sin(time*2+b.x)*.2}
   for(const o of R.objs.values())if(o.type==='ball')o.m.rotation.x+=dt*10;
   // Kamera
-  const me=R.me;if(me){const fx=Math.sin(me.yaw),fz=Math.cos(me.yaw);const back=me.spin>0?8:7.2;
-    const tgt=new THREE.Vector3(me.x-fx*back,3.3,me.z-fz*back);camPos.lerp(tgt,1-Math.pow(.0008,dt));camLook.set(me.x+fx*4,1.2,me.z+fz*4);
-    camera.position.copy(camPos);camera.lookAt(camLook);const fov=68+clamp(me.speed/me.st.max,0,1.4)*8+(me.boost>0?6:0);camera.fov=lerp(camera.fov,fov,.08);camera.updateProjectionMatrix();
+  const me=R.me;if(me){R.camYaw=R.camYaw==null?me.ryaw:R.camYaw+angDiff(R.camYaw,me.ryaw)*(1-Math.exp(-dt*(me.spin>0?2:6.5)));
+    const fx=Math.sin(R.camYaw),fz=Math.cos(R.camYaw);const back=me.spin>0?8:7.2;
+    camTgt.set(me.rx-fx*back,3.3,me.rz-fz*back);camPos.lerp(camTgt,1-Math.exp(-dt*14));const lf=Math.sin(me.ryaw),lz=Math.cos(me.ryaw);camLook.set(me.rx+(lf+fx)*2,1.2,me.rz+(lz+fz)*2);
+    camera.position.copy(camPos);camera.lookAt(camLook);const fov=68+clamp(me.speed/me.st.max,0,1.4)*8+(me.boost>0?6:0);camera.fov+=(fov-camera.fov)*(1-Math.exp(-dt*5));camera.updateProjectionMatrix();
     Snd.engine(me.speed,R.started&&!G.paused)}
   hud();
 }
@@ -901,6 +956,8 @@ let hudTick=0;const mm=$('#minimap'),mg=mm.getContext('2d');
 function fmt(t){const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(2)}
 function hud(){
   const R=G.race,me=R.me;if(!me)return;
+  const db=$('#driftBar');db.classList.toggle('on',!!me.drift);if(me.drift){const t=me.driftT||0;db.firstChild.style.width=Math.min(t/1.9,1)*100+'%';db.firstChild.style.background=t>1.9?'#ff9a1f':t>.9?'var(--sky)':'rgba(242,246,255,.6)'}
+  const inp=readInput();for(const li of kmItems){const k=li.dataset.k;li.classList.toggle('on',k==='steer'?inp.steer!==0:!!inp[k])}
   if(++hudTick%3)return;
   const rl=rankList();const pos=rl.indexOf(me)+1;
   const cometOnMe=pos===1&&!me.finished&&[...R.objs.values()].some(o=>o.type==='comet'&&o.age>.7);$('#warn').classList.toggle('on',cometOnMe);
@@ -910,7 +967,7 @@ function hud(){
   const icon=me.roll>0?ICONS[ITEM_KEYS[Math.floor(performance.now()/70)%ITEM_KEYS.length]]:me.item?ICONS[me.item]:'';
   if($('#itemIcon').dataset.v!==icon){$('#itemIcon').innerHTML=icon;$('#itemIcon').dataset.v=icon}
   $('#itemCount').hidden=!(me.item==='boost3'&&me.count>1);$('#itemCount').textContent=me.count;
-  $('#hudRank').innerHTML=rl.map((k,i)=>`<li class="${k===me?'me':''}"><b>${i+1}.</b><i style="background:${hex(k.ch.kart)}"></i><span>${k.name.replace(/[<>&]/g,'')}</span></li>`).join('');
+  const rk=rl.map(k=>k.id).join();if(rk!==R.rankKey){R.rankKey=rk;$('#hudRank').innerHTML=rl.map((k,i)=>`<li class="${k===me?'me':''}"><b>${i+1}.</b><i style="background:${hex(k.ch.kart)}"></i><span>${k.name.replace(/[<>&]/g,'')}</span></li>`).join('')}
   // Minimap
   const w=mm.width,h=mm.height;mg.clearRect(0,0,w,h);const ti=TRACKS.indexOf(R.T.def);const f=mapFit[ti]||(mapFit[ti]=fitPath(trackPaths[ti],w,h,26));
   mg.lineJoin='round';mg.beginPath();trackPaths[ti].forEach(([x,z],i)=>{const[a,b]=f(x,z);i?mg.lineTo(a,b):mg.moveTo(a,b)});mg.closePath();
@@ -945,16 +1002,19 @@ $('#mute').checked=Snd.muted;$('#mute').onchange=e=>{Snd.muted=e.target.checked;
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
 addEventListener('resize',resize);resize();
 let last=performance.now(),acc=0;
-function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000,.1);last=now;const time=now/1000;
-  if(G.race){if(!G.paused){acc+=dt;let n=0;while(acc>=1/60&&n<6){stepRace(1/60);acc-=1/60;n++}if(n>=6)acc=0}renderRace(dt,time)}
+let pr=Math.min(devicePixelRatio,2),slowT=0;
+function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000,.25);last=now;const time=now/1000;
+  // Auflösung automatisch senken, wenn der Rechner nicht hinterherkommt
+  if(dt>.022){slowT+=dt;if(slowT>2&&pr>1){pr=Math.max(1,pr-.25);renderer.setPixelRatio(pr);resize();slowT=0}}else slowT=Math.max(0,slowT-dt*.5);
+  if(G.race){if(!G.paused){acc+=dt;let n=0;while(acc>=1/60&&n<16){stepRace(1/60);acc-=1/60;n++}if(n>=16)acc=0;netSend(dt)}renderRace(dt,time,clamp(acc*60,0,1))}
   else{ // Menü
     if(menuKart){menuKart.g.rotation.y=time*.6;for(const w of menuKart.wheels)w.w.rotation.x=time*3}
     floatBoxes.forEach((b,i)=>{b.rotation.y=time+i;b.rotation.x=time*.7;b.position.y=2.2+Math.sin(time*1.4+i)*.5});
     const wide=innerWidth>700;camera.fov=50;if(wide){camera.position.set(0,3.4,9);camera.lookAt(-3.6,1.5,0)}else{camera.position.set(0,3.2,11);camera.lookAt(0,-2.4,0)}camera.updateProjectionMatrix()}
-  renderer.render(scene,camera)}
+  renderer.render(scene,camera);if(window.__kkLog)window.__kkLog()}
 enterMenu();setMenuKart();show('scrTitle');requestAnimationFrame(frame);
 setNetStatus(false);$('#netStatus').className='status';$('#netStatus').lastElementChild.textContent='Suche Online-Server …';
 let tries=0;function tryConnect(){Net.connect().then(ok=>{setNetStatus(ok);if(ok){titleErr('');return}if(/^https?:$/.test(location.protocol)&&++tries<8)setTimeout(tryConnect,4000)})}
 tryConnect();
-window.__kk={G,Net,startRace,TRACKS,stepRace,rankList,showResults};
+window.__kk={G,Net,startRace,TRACKS,stepRace,rankList,showResults,renderer,serverNow};
 </script>

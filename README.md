@@ -1,6 +1,6 @@
 # Krawall Kart
 
-Multiplayer-Kartrennen im Browser: 6 Fahrer, 4 Strecken, Item-Boxen, Drift-Turbo, Bots und Lobbys mit 5-stelligem Einladungscode.
+Multiplayer-Kartrennen im Browser: 6 Fahrer, 18 Strecken in 6 Cups (Cup-Modus mit Punkten über 3 Rennen oder Einzelrennen), Item-Boxen, Drift-Turbo, Bots und Lobbys mit 5-stelligem Einladungscode.
 
 ## Auf Render hosten
 1. Auf [render.com](https://render.com) einloggen → **New → Blueprint** → dieses Repo wählen (nutzt `render.yaml`).

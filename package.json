@@ -1,0 +1,9 @@
+{
+  "name": "krawall-kart",
+  "version": "1.0.0",
+  "description": "Krawall Kart – Multiplayer-Kartrennen im Browser",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
+}

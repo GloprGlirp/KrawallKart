@@ -1,6 +1,6 @@
 # Krawall Kart
 
-Multiplayer-Kartrennen im Browser: 14 Fahrer, 18 große Strecken in 6 Cups mit Abzweigungen (Schotter-Abkürzungen und Panoramawege) (Cup-Modus mit Punkten über 3 Rennen oder Einzelrennen), 11 Items (u. a. Spitzenreiter-Komet, Krachbombe, Tarnkappe), Drift-Turbo, Bots und Lobbys mit 5-stelligem Einladungscode.
+Multiplayer-Kartrennen im Browser: 14 Fahrer mit Fahrzeug-Baukasten (Karosserie, Reifen, Gleiter), 27 Strecken in 9 Cups mit Höhen, Gleiter-Schluchten, Schanzen, Stampfern und 2–3 Abzweigungen pro Strecke, 11 Items, Siegerehrung nach jedem Cup, Bots und Lobbys mit 5-stelligem Einladungscode.
 
 ## Auf Render hosten
 1. Auf [render.com](https://render.com) einloggen → **New → Blueprint** → dieses Repo wählen (nutzt `render.yaml`).
@@ -17,4 +17,4 @@ npm start
 Dann http://localhost:3000 öffnen.
 
 ## Steuerung
-W/↑ Gas · S/↓ Bremse · A D/← → Lenken · Shift/Leertaste Driften (lange halten = Turbo) · E/Strg Item · R zurück auf die Strecke · Esc Pause · M Ton aus
+W/↑ Gas · S/↓ Bremse (im Gleiter: schneller sinken) · A D/← → Lenken · Shift/Leertaste Driften (lange halten = Turbo, in der Luft = Trick) · E/Strg Item · R zurück auf die Strecke · H Tastenübersicht · Esc Pause · M Ton aus
